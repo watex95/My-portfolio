@@ -1,0 +1,717 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  html_notebook: default
+---
+
+# DATA WRANGLING
+
+### FINANCIAL AID DATA
+
+```{r,warning=FALSE}
+financial_aid<-read.csv("financial_aid.csv",header = T)
+summary(financial_aid)
+
+```
+
+Combine by summing the loan, scholarship, grant and work/study data from 2011 to 2017
+
+```{r,warning=FALSE}
+
+library(tidyverse)
+attach(financial_aid)
+financial_aid=financial_aid %>%
+  mutate(Total_loan = select(.,c(X2012.Loan,X2013.Loan,X2014.Loan,
+           X2015.Loan,X2016.Loan,X2017.Loan)) %>%
+           rowSums(na.rm = TRUE))
+
+financial_aid<-financial_aid%>%
+  mutate(Total_grant=select(.,c(X2012.Grant,X2013.Grant,X2014.Grant,
+          X2015.Grant,X2016.Grant,X2017.Grant))%>%
+           rowSums(na.rm = TRUE))
+
+financial_aid<-financial_aid%>%
+  mutate(Total_scholarship=select(.,c(X2012.Scholarship,X2013.Scholarship,X2014.Scholarship,
+            X2015.Scholarship,X2016.Scholarship,X2017.Scholarship))%>%
+           rowSums(na.rm = TRUE))
+
+financial_aid<-financial_aid%>%
+  mutate(Total_WorkStudy=select(.,c(X2012.Work.Study,X2013.Work.Study,
+    X2014.Work.Study,X2015.Work.Study,X2016.Work.Study,X2017.Work.Study))%>%
+           rowSums(na.rm = TRUE))
+
+# Variables 
+colnames(financial_aid)
+
+```
+
+
+Data cleaning : financial aid data
+```{r,warning=FALSE}
+# drop the extra periodical financial data 
+financial_aid<-financial_aid[,-c(9:32)]
+
+# Load the train labels and the TestIDs
+train_labels=read.csv("DropoutTrainLabels.csv",header = T)
+testIDs=read.csv("TestIDs.csv",header = T)
+
+```
+
+
+JOIN the train labels and the financial aid data
+
+```{r,warning=FALSE}
+library(dplyr)
+financial_aid_train=left_join(train_labels,financial_aid,by="StudentID")
+dim(financial_aid_train)
+# JOIN the test IDs and the financial aid data
+financial_aid_test=left_join(testIDs,financial_aid,by="StudentID")
+dim(financial_aid_test)
+
+```
+
+
+Check for duplicated StudentID (TRUE=No duplicates, FALSE=duplicates present)
+
+```{r,warning=FALSE}
+
+length(unique(financial_aid_train$StudentID)) == nrow(financial_aid_train)
+
+```
+
+
+### STATIC DATA
+STATIC data files loaded and merged 
+
+```{r,warning=FALSE}
+#load all files and merge them
+myETL=function(mypath){
+  filenames = list.files(path=mypath, full.names=TRUE)
+  file_load = function(x){read.csv(file=x,header=T)}
+  datalist = lapply(filenames, file_load)
+  data2 = do.call(rbind, lapply(datalist, as.data.frame))
+  return(data2)
+}
+# call the function
+mergedStatic<-myETL("D:/KAZI/UPWORK/KAGGLE COMPETITION/Student Retention Challenge Data/Student Static Data")
+
+# Variable names in static dataset
+colnames(mergedStatic)
+
+```
+
+
+Check for duplicated StudentID (TRUE=No duplicates, FALSE=duplicates present)
+```{r,warning=FALSE}
+length(unique(mergedStatic$StudentID)) == nrow(mergedStatic)
+
+```
+
+
+JOIN the train labels and the static data
+
+```{r,warning=FALSE}
+library(dplyr)
+static_train=left_join(train_labels,mergedStatic,by="StudentID")
+summary(static_train)
+
+# JOIN the test IDs and the static data
+static_test=left_join(testIDs,mergedStatic,by="StudentID")
+
+```
+
+
+
+### PROGRESS DATA
+Progress data files loaded and merged
+```{r,warning=FALSE}
+
+myETL=function(mypath){
+filenames = list.files(path=mypath, full.names=TRUE)
+file_load = function(x){read.csv(file=x,header=T)}
+datalist = lapply(filenames, file_load)
+data2 = do.call(rbind, lapply(datalist, as.data.frame))
+return(data2)
+}
+
+# call the function
+mergedProgress<-myETL("D:/KAZI/UPWORK/KAGGLE COMPETITION/Student Retention Challenge Data/Student Progress Data")
+
+# variable names in the progress data
+colnames(mergedProgress)
+dim(mergedProgress)
+```
+
+
+Check for duplicated StudentID (TRUE=No duplicates, FALSE=duplicates present)
+```{r,warning=FALSE}
+
+length(unique(mergedProgress$StudentID)) == nrow(mergedProgress)
+
+
+```
+
+
+Summarise the data to get rid of duplicated StudentID
+
+```{r,warning=FALSE}
+library(plyr)
+prog1=ddply(mergedProgress,.(StudentID),summarize,
+            CompleteDevMath=mean(CompleteDevMath),CompleteDevEnglish=mean(CompleteDevEnglish),
+            Major1=mean(Major1),Major2=mean(Major2),Complete1=mean(Complete1),
+            Complete2=mean(Complete2),CompleteCIP1=mean(CompleteCIP1),
+            CompleteCIP2=mean(CompleteCIP2),TransferIntent=mean(TransferIntent),
+            DegreeTypeSought=mean(DegreeTypeSought),TermGPA=mean(CumGPA),
+            CumGPA=mean(CumGPA),number=length(StudentID))
+dim(prog1)
+
+# drop the irrelevant frequency column
+prog1<-prog1[,-14]
+dim(prog1)
+
+
+# JOIN the train labels and the progress data
+library(dplyr)
+progress_train=left_join(train_labels,prog1,by="StudentID")
+# JOIN the test IDs and the progress data
+progress_test=left_join(testIDs,prog1,by="StudentID")
+
+dim(progress_train)
+
+# variables names for the progress data
+summary(progress_train)
+
+```
+
+Check to ensure that all the datasets are of the same sizes before merging them
+
+```{r}
+
+dim(financial_aid_train)
+dim(financial_aid_test)
+
+dim(static_train)
+dim(static_test)
+
+dim(progress_train)
+dim(progress_test)
+
+```
+
+
+
+### TRAINING DATASET
+
+```{r}
+
+library(dplyr)
+join1<-inner_join(financial_aid_train,static_train,by="StudentID")
+TRAIN_DATA=inner_join(join1,progress_train,by="StudentID")
+colnames(TRAIN_DATA)
+
+dim(TRAIN_DATA)
+
+# TESTING DATASET
+join2<-inner_join(financial_aid_test,static_test,by="StudentID")
+TEST_DATA<-inner_join(join2,progress_test,by="StudentID")
+dim(TEST_DATA)
+
+
+# Clean the train data by removing extra dropout variables (Dropout.y,Dropout)
+TRAIN_DATA<-select(TRAIN_DATA,-c("Dropout.y"))
+TRAIN_DATA<-select(TRAIN_DATA,-c("Dropout"))
+
+# Rename the droput.x to just dropout for consistency
+library(dplyr)
+colnames(TRAIN_DATA)[colnames(TRAIN_DATA)=="Dropout.x"] <- "Dropout"
+
+dim(TRAIN_DATA)
+dim(TEST_DATA)
+
+# The response variable
+TRAIN_DATA$Dropout[1:5]
+
+# The features of our project that will be analysed further
+colnames(TEST_DATA)
+
+```
+
+
+```{r,warning=FALSE}
+# convert empty spaces and (-1) to NULL in order to facilitate imputation later on
+TRAIN_DATA[TRAIN_DATA=="-1"]<-NA
+TRAIN_DATA[TRAIN_DATA==""]<-NA
+
+# convert the theorically categorical variables to  factors 
+names=c('DegreeTypeSought','TransferIntent','CompleteDevEnglish','CompleteDevMath',
+  'GatewayEnglishStatus','GatewayMathStatus','EngPlacement','MathPlacement',
+  'HighDeg','EnrollmentStatus','FirstGen','HSDip','BirthMonth','BirthYear',
+  'Gender','Campus','CohortTerm','cohort_term','Dropout')
+
+TRAIN_DATA[,names] <- lapply(TRAIN_DATA[,names] , factor)
+str(TRAIN_DATA)
+
+```
+
+
+
+# EXPLORATORY DATA ANALYSIS
+
+```{r}
+# Summarize the data
+summary(TRAIN_DATA)
+# visualize the financial information in relation to the dropout variable
+library(dplyr)
+ggplot(data = TRAIN_DATA, mapping = aes(x =Dropout,y=Total_loan))+
+  geom_boxplot()
+
+ggplot(data = TRAIN_DATA, mapping = aes(x =Dropout,y=Total_grant))+
+  geom_boxplot()
+
+ggplot(data = TRAIN_DATA, mapping = aes(x =Dropout,y=Total_scholarship))+
+  geom_boxplot()
+
+ggplot(data = TRAIN_DATA, mapping = aes(x =Dropout,y=Total_WorkStudy))+
+  geom_boxplot()
+
+```
+
+
+Frequency analysis for categorical variables in relation to the Dropout variable
+```{r}
+# Dropout
+table(TRAIN_DATA$Dropout,exclude = NULL)
+
+
+# Marital.Status
+table(TRAIN_DATA$Marital.Status,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = Marital.Status,fill=Dropout))
+
+# Father.s.Highest.Grade.Level
+table(TRAIN_DATA$Father.s.Highest.Grade.Level,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = Father.s.Highest.Grade.Level,fill=Dropout))
+
+# Mother.s.Highest.Grade.Level
+table(TRAIN_DATA$Mother.s.Highest.Grade.Level,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = Mother.s.Highest.Grade.Level,fill=Dropout))
+
+# Housing
+table(TRAIN_DATA$Housing,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = Housing,fill=Dropout))
+
+
+# Cohort
+table(TRAIN_DATA$Cohort,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = Cohort,fill=Dropout))
+
+# CohortTerm
+table(TRAIN_DATA$CohortTerm,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = CohortTerm,fill=Dropout))
+
+# MathPlacement
+table(TRAIN_DATA$MathPlacement,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = MathPlacement,fill=Dropout))
+
+
+# State
+table(TRAIN_DATA$State,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = State,fill=Dropout))
+
+# Gender
+table(TRAIN_DATA$Gender,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = Gender,fill=Dropout))
+
+# Hispanic
+table(TRAIN_DATA$Hispanic,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = Hispanic,fill=Dropout))
+
+# AmericanIndian
+table(TRAIN_DATA$AmericanIndian,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = AmericanIndian,fill=Dropout))
+
+
+# Asian
+table(TRAIN_DATA$Asian,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = Asian,fill=Dropout))
+
+# Black
+table(TRAIN_DATA$Black,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = Black,fill=Dropout))
+
+# NativeHawaiian
+table(TRAIN_DATA$NativeHawaiian,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = NativeHawaiian,fill=Dropout))
+
+# White
+table(TRAIN_DATA$White,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = White,fill=Dropout))
+
+
+# TwoOrMoreRace
+table(TRAIN_DATA$TwoOrMoreRace,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = TwoOrMoreRace,fill=Dropout))
+
+
+# HSDip
+table(TRAIN_DATA$HSDip,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = HSDip,fill=Dropout))
+
+
+# TwoOrMoreRace
+table(TRAIN_DATA$TwoOrMoreRace,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = TwoOrMoreRace,fill=Dropout))
+
+# HighDeg
+table(TRAIN_DATA$HighDeg,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = HighDeg,fill=Dropout))
+
+# EngPlacement
+table(TRAIN_DATA$EngPlacement,TRAIN_DATA$Dropout,exclude = NULL)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = EngPlacement,fill=Dropout))
+
+# GatewayMathStatus
+table(TRAIN_DATA$GatewayMathStatus,TRAIN_DATA$Dropout)
+ggplot(data = TRAIN_DATA) +
+  geom_bar(mapping = aes(x = GatewayMathStatus,fill=Dropout))
+
+```
+
+Correlation matrix of the financial aid data to check for multicollinearity among the continuous independent variables
+
+```{r}
+# Load the GGally package
+library(GGally)
+# Create a scatter plot matrix
+vars <- c("Total_loan", "Total_grant", "Total_WorkStudy", "Total_scholarship",
+          "Adjusted.Gross.Income","Parent.Adjusted.Gross.Income","CumLoanAtEntry")
+ggpairs(TRAIN_DATA[vars])
+
+```
+
+
+Correlation matrix of the student performance to check for multicollinearity among the continuous independent variables
+
+```{r}
+
+# Load the GGally package
+library(GGally)
+# Create a scatter plot matrix
+vars <- c("CumGPA", "HSGPAWtd","TermGPA","HSGPAUnwtd","HSGPAWtd")
+ggpairs(TRAIN_DATA[vars])
+
+```
+
+
+
+#### Hypotheses tests 
+
+```{r}
+# Test for association
+# The dropout of students is not related to gender of a student
+attach(TRAIN_DATA)
+chisq.test(Dropout,Gender)
+
+# The dropout of students is not related to Marital.Status of a student 
+chisq.test(Marital.Status,Dropout)
+
+# The dropout of students is not related to the housing of a student 
+chisq.test(Housing,Dropout)
+
+ #The dropout of students is not related to the Father.s.Highest.Grade.Level 
+chisq.test(Father.s.Highest.Grade.Level,Dropout)
+
+# The dropout of students is not related to the Mother.s.Highest.Grade.Level 
+chisq.test(Mother.s.Highest.Grade.Level,Dropout)
+
+# The dropout of students is not related to GatewayMathStatus of the student
+chisq.test(GatewayEnglishStatus,Dropout)
+
+
+```
+
+
+### IMPUTATION OF MISSING VALUES
+
+Summarize and look for the count of NA's in Individual variables 
+```{r}
+summary(TRAIN_DATA)
+```
+
+List the columns with missing values
+
+```{r}
+colnames(TRAIN_DATA)[colSums(is.na(TRAIN_DATA)) > 0]
+
+```
+
+
+Looking at the dataframe there are variables that have missing values close to 90% of the whole column (>11,000), these variables if imputed may introduce bias, hence they are dropped
+
+```{r}
+drop.cols <- c('HSGPAWtd', 'FirstGen','TransferIntent','Campus',
+               'Address2','Major2')
+TRAIN_DATA<-TRAIN_DATA %>% select(-drop.cols)
+dim(TRAIN_DATA)
+str(TRAIN_DATA)
+```
+
+
+Impute categorical variables with mode
+
+```{r}
+
+val<-unique(TRAIN_DATA$Marital.Status[!is.na(TRAIN_DATA$Marital.Status)]) # Values in vec_miss
+mode <- val[which.max(tabulate(match(TRAIN_DATA$Marital.Status, val)))] # Mode of vec_miss
+TRAIN_DATA$Marital.Status[is.na(TRAIN_DATA$Marital.Status)]<-mode # Impute by mode
+
+val<-unique(TRAIN_DATA$Father.s.Highest.Grade.Level[!is.na(TRAIN_DATA$Father.s.Highest.Grade.Level)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$Father.s.Highest.Grade.Level, val)))] 
+TRAIN_DATA$Father.s.Highest.Grade.Level[is.na(TRAIN_DATA$Father.s.Highest.Grade.Level)]<-mode 
+
+val<-unique(TRAIN_DATA$Mother.s.Highest.Grade.Level[!is.na(TRAIN_DATA$Mother.s.Highest.Grade.Level)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$Mother.s.Highest.Grade.Level, val)))] 
+TRAIN_DATA$Mother.s.Highest.Grade.Level[is.na(TRAIN_DATA$Mother.s.Highest.Grade.Level)]<-mode 
+
+val<-unique(TRAIN_DATA$Housing[!is.na(TRAIN_DATA$Housing)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$Housing, val)))] 
+TRAIN_DATA$Housing[is.na(TRAIN_DATA$Housing)]<-mode
+
+
+val<-unique(TRAIN_DATA$EngPlacement[!is.na(TRAIN_DATA$EngPlacement)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$EngPlacement, val)))] 
+TRAIN_DATA$EngPlacement[is.na(TRAIN_DATA$EngPlacement)]<-mode
+
+val<-unique(TRAIN_DATA$MathPlacement[!is.na(TRAIN_DATA$MathPlacement)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$MathPlacement, val)))] 
+TRAIN_DATA$MathPlacement[is.na(TRAIN_DATA$MathPlacement)]<-mode
+
+val<-unique(TRAIN_DATA$CompleteDevEnglish[!is.na(TRAIN_DATA$MathPlacement)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$CompleteDevEnglish, val)))] 
+TRAIN_DATA$CompleteDevEnglish[is.na(TRAIN_DATA$CompleteDevEnglish)]<-mode
+
+val<-unique(TRAIN_DATA$CompleteDevMath[!is.na(TRAIN_DATA$CompleteDevMath)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$CompleteDevMath, val)))] 
+TRAIN_DATA$CompleteDevMath[is.na(TRAIN_DATA$CompleteDevMath)]<-mode
+
+val<-unique(TRAIN_DATA$Address1[!is.na(TRAIN_DATA$Address1)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$Address1, val)))] 
+TRAIN_DATA$Address1[is.na(TRAIN_DATA$Address1)]<-mode 
+
+val<-unique(TRAIN_DATA$State[!is.na(TRAIN_DATA$State)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$State, val)))] 
+TRAIN_DATA$State[is.na(TRAIN_DATA$State)]<-mode 
+
+val<-unique(TRAIN_DATA$City[!is.na(TRAIN_DATA$City)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$City, val)))] 
+TRAIN_DATA$City[is.na(TRAIN_DATA$City)]<-mode 
+
+val<-unique(TRAIN_DATA$Zip[!is.na(TRAIN_DATA$Zip)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$Zip, val)))] 
+TRAIN_DATA$Zip[is.na(TRAIN_DATA$Zip)]<-mode 
+
+val<-unique(TRAIN_DATA$BirthYear[!is.na(TRAIN_DATA$BirthYear)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$BirthYear, val)))] 
+TRAIN_DATA$BirthYear[is.na(TRAIN_DATA$BirthYear)]<-mode 
+
+
+val<-unique(TRAIN_DATA$Hispanic[!is.na(TRAIN_DATA$Hispanic)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$Hispanic, val)))] 
+TRAIN_DATA$Hispanic[is.na(TRAIN_DATA$Hispanic)]<-mode 
+
+val<-unique(TRAIN_DATA$AmericanIndian[!is.na(TRAIN_DATA$AmericanIndian)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$AmericanIndian, val)))] 
+TRAIN_DATA$AmericanIndian[is.na(TRAIN_DATA$AmericanIndian)]<-mode 
+
+val<-unique(TRAIN_DATA$Asian[!is.na(TRAIN_DATA$Asian)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$Asian, val)))] 
+TRAIN_DATA$Asian[is.na(TRAIN_DATA$Asian)]<-mode 
+
+val<-unique(TRAIN_DATA$Black[!is.na(TRAIN_DATA$Black)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$Black, val)))] 
+TRAIN_DATA$Black[is.na(TRAIN_DATA$Black)]<-mode 
+
+val<-unique(TRAIN_DATA$NativeHawaiian[!is.na(TRAIN_DATA$NativeHawaiian)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$NativeHawaiian, val)))] 
+TRAIN_DATA$NativeHawaiian[is.na(TRAIN_DATA$NativeHawaiian)]<-mode 
+
+val<-unique(TRAIN_DATA$White[!is.na(TRAIN_DATA$White)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$White, val)))] 
+TRAIN_DATA$White[is.na(TRAIN_DATA$White)]<-mode 
+
+val<-unique(TRAIN_DATA$TwoOrMoreRace[!is.na(TRAIN_DATA$TwoOrMoreRace)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$TwoOrMoreRace, val)))] 
+TRAIN_DATA$TwoOrMoreRace[is.na(TRAIN_DATA$TwoOrMoreRace)]<-mode 
+
+val<-unique(TRAIN_DATA$HSDip[!is.na(TRAIN_DATA$HSDip)])
+mode<-val[which.max(tabulate(match(TRAIN_DATA$HSDip, val)))] 
+TRAIN_DATA$HSDip[is.na(TRAIN_DATA$HSDip)]<-mode 
+
+
+# which columns have missing data
+colnames(TRAIN_DATA)[colSums(is.na(TRAIN_DATA)) > 0]
+
+```
+
+
+
+Imputing continuous variables
+
+First check for normal distribution in order to impute with mean or median if they are not normally distributed (bell-shaped histogram and density plot shows normality)
+
+```{r,warning=FALSE}
+
+#Density plot
+library(ggpubr)
+ggdensity(TRAIN_DATA$Adjusted.Gross.Income, 
+          main = "Density plot of tooth length",
+          xlab = "Tooth length")
+```
+
+
+```{r,warning=FALSE}
+#Histogram
+
+hist(TRAIN_DATA$Adjusted.Gross.Income) #histogram
+```
+
+
+```{r,warning=FALSE}
+# QQplot
+ggqqplot(TRAIN_DATA$Adjusted.Gross.Income) #qqplot
+
+
+```
+
+
+```{r,warning=FALSE}
+# Density plot
+ggdensity(TRAIN_DATA$Parent.Adjusted.Gross.Income, 
+          main = "Density plot of tooth length",
+          xlab = "Tooth length")
+```
+
+
+```{r,warning=FALSE}
+# Histogram
+hist(TRAIN_DATA$Parent.Adjusted.Gross.Income) #histogram
+
+```
+
+
+```{r,warning=FALSE}
+# QQplot
+ggqqplot(TRAIN_DATA$Parent.Adjusted.Gross.Income) #qqplot
+
+
+```
+
+- NOTE: the continous variables did not display normal distribution properties, thus imputation will be done using median
+
+#### Impute continuous variables using median
+
+```{r,warning=FALSE}
+
+for(i in 1:nrow(TRAIN_DATA)) {
+  TRAIN_DATA[i, ][is.na(TRAIN_DATA[i,])]<-median(as.numeric(TRAIN_DATA[i,]), na.rm = TRUE)
+}
+
+```
+
+
+
+# FEATURE ENGINEERING
+
+Implement feature selection using Boruta package 
+```{r,warning=FALSE}
+library(Boruta)
+
+# Now is the time to implement and check the performance of boruta package. The syntax of boruta is almost similar to regression (lm) method.
+
+set.seed(123)
+boruta.train <- Boruta(Dropout~.-StudentID, data = TRAIN_DATA, doTrace = 2)
+print(boruta.train)
+
+
+# Now, we’ll plot the boruta variable importance chart.
+plot(boruta.train, xlab = "", xaxt = "n")
+ lz<-lapply(1:ncol(boruta.train$ImpHistory),function(i)
+  boruta.train$ImpHistory[is.finite(boruta.train$ImpHistory[,i]),i])
+ names(lz) <- colnames(boruta.train$ImpHistory)
+ Labels <- sort(sapply(lz,median))
+ axis(side = 1,las=2,labels = names(Labels),
+       at = 1:ncol(boruta.train$ImpHistory), cex.axis = 0.7)
+
+
+```
+
+
+
+
+```{r,warning=FALSE}
+# Blue boxplots correspond to minimal, average and maximum Z score of a shadow attribute. Red, yellow and green boxplots represent Z scores of rejected, tentative and confirmed attributes respectively.
+# Now is the time to take decision on tentative attributes.  The tentative attributes will be classified as confirmed or rejected by comparing the median Z score of the attributes with the median Z score of the best shadow attribute. Let’s do it.
+
+final.boruta <- TentativeRoughFix(boruta.train)
+print(final.boruta)
+
+
+```
+
+
+
+
+```{r,warning=FALSE}
+# We’ll create a data frame of the final result derived from Boruta.
+boruta.df <- attStats(final.boruta)
+class(boruta.df)
+
+print(boruta.df)
+
+
+# It’s time for results now. Let’s obtain the list of confirmed attributes
+features=getSelectedAttributes(final.boruta, withTentative = F) 
+features
+
+TRAIN_SET=TRAIN_DATA[,features]
+TRAIN_SET$Dropout=TRAIN_DATA$Dropout
+dim(TRAIN_SET)
+
+```
+
+Let’s understand the parameters used in Boruta as follows:
+
+- maxRuns: maximal number of random forest runs.
+You can consider increasing this parameter if tentative attributes are left.Default is 100.
+- doTrace: It refers to verbosity level. 0 means no tracing. 1 means reporting attribute decision as soon as it is cleared. 2 means all of 1 plus additionally reporting each iteration. Default is 0.
+- holdHistory: The full history of importance runs is stored if set to TRUE
+(Default). Gives a plot of Classifier run vs. Importance when the plotImpHistory function is called.
+
+
+
+
+
+
+
+
+

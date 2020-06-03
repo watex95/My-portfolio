@@ -1,0 +1,489 @@
+---
+title: 'Student Dropout Competition: Modelling'
+author: "Hamed"
+date: "3/24/2020"
+output: word_document
+---
+
+
+# MODELLING
+
+```{r}
+# Load the engineered and transformed features
+transformed_train=read.csv("transformed_train.csv",header = T)
+transformed_test=read.csv("transformed_test.csv",header = T)
+
+# Convert the response variable from an integer to a factor
+transformed_train$Dropout=as.factor(transformed_train$Dropout)
+
+# Load required packages
+library(class)
+library(caret)
+library(rpart)
+library(dplyr)
+
+
+# Split the transformed_train dataset into training and validation datasets
+set.seed(123)
+## 80% of the sample size
+smp_size <- floor(0.80 * nrow(transformed_train))
+train_ind <- sample(seq_len(nrow(transformed_train)), size = smp_size)
+train.set <- transformed_train[train_ind, ]
+validation.set <- transformed_train[-train_ind, ]
+
+dim(train.set)
+
+str(train.set)
+```
+
+
+## 1. Logistic Regression
+
+```{r,warning=FALSE}
+library(mlbench)     # for PimaIndiansDiabetes2 dataset
+library(dplyr)       # for data manipulation (dplyr) 
+library(broom)       # for making model summary tidy
+library(visreg)      # for potting logodds and probability 
+library(margins)     # to calculate Average Marginal Effects
+library(rcompanion)  # to calculate pseudo R2
+library(ROCR)        # to compute and plot Reciever Opering Curve
+
+#Fitting a binary logistic regression
+model_logi <- glm(Dropout~., data = train.set, family = "binomial")
+#Model summary
+summary(model_logi)
+
+```
+
+Model fit statistics
+
+```{r,warning=FALSE}
+
+# Pseudo R_squared values and Likelyhood ratio test
+nagelkerke(model_logi)
+
+```
+
+
+ODDS Ratios
+
+```{r,warning=FALSE}
+# The ODDS ratio can be retrieved in a beautiful tidy formatted table
+# using the tidy( ) function of broom package.
+tidy(model_logi, exponentiate = TRUE, conf.level = 0.95) #odds ratio
+```
+
+Model Evaluation on Test Data Set
+
+```{r,warning=FALSE}
+
+# Confusion matrix
+# predict the test dataset
+pred <- predict(model_logi, validation.set, type="response") 
+predicted <-ifelse(pred>0.5,1,0) # round of the value; >0.5 will convert to 1 else 0
+table(predicted)
+
+# Creating a contigency table
+tab <- table(Predicted = predicted, Reference = validation.set$Dropout)
+tab
+
+```
+
+
+Accuracy
+
+```{r,warning=FALSE}
+# Creating a dataframe of observed and predicted data
+library(yardstick)
+act_pred <- data.frame(observed = validation.set$Dropout, predicted=factor(predicted))
+
+# Calculating Accuracy
+accuracy_est <- accuracy(act_pred, observed, predicted)
+print(accuracy_est)
+
+```
+
+
+Classification Report
+
+```{r,warning=FALSE}
+# Precision, F1-score and recall values
+library(yardstick)
+# Creating a actual/observed vs predicted dataframe
+act_pred <- data.frame(observed = validation.set$Dropout, predicted =  
+                         factor(predicted))
+# Calculating precision, recall and F1_score
+prec <- precision(act_pred, observed, predicted)
+rec <- recall(act_pred, observed, predicted)
+F1_score <- f_meas(act_pred, observed, predicted) #called f_measure
+print(prec)
+print(rec)
+print(F1_score)
+
+```
+
+
+Prediction using new data
+
+```{r,warning=FALSE}
+pred_log <- predict(model_logi, transformed_test, type="response") 
+pred_log
+
+predicted <- round(pred_log) # round of the value; >0.5 will convert to 1 else 0
+submission_lr=as.data.frame(predicted)
+
+head(submission_lr)
+
+# save the file
+#write.csv(submission_lr,"D:/Hamed/KAGGLE COMPETITION/FEATURES/my_new_submission/submission_lr.csv")
+
+
+```
+
+
+## 2. Support Vector Machine (SVM)
+
+```{r,warning=FALSE}
+library(dplyr)
+library(mlr)
+library(caret)
+library(ROCR)
+library(kernlab)
+library(e1071)
+library(foreach)
+library(doParallel)
+model_svm <- svm(Dropout~.,data=train.set,trControl=trainControl("cv",number=10),
+                 tuneGrid = expand.grid(C=c(.01,.02,.05,.1,.2,.5,1,2,5,10)
+                  ,degree=c(1:5),scale=c(0.01:1)),tuneLength = 4)
+
+summary(model_svm)
+
+model_svm$cost#displays cost , error, degree and scale of the model
+model_svm$epsilon #displays the accuracy of the model crossvalidated 
+
+
+```
+
+Model Evaluation
+
+```{r,warning=FALSE}
+
+x=validation.set[,-53]
+y=validation.set[,53]
+pred <- predict(model_svm,x)
+confusionMatrix(pred,y)
+
+
+```
+
+Predict the test data
+
+```{r,warning=FALSE}
+pred_test=predict(model_svm,transformed_test)
+table(pred_test)
+
+# Create a submission file
+submission_svm=as.data.frame(pred_test)
+
+head(submission_svm)
+#write.csv(pred_test,"D:/Hamed/KAGGLE COMPETITION/FEATURES/my_new_submission/submission_svm.csv")
+
+```
+
+
+
+## 3. Decision Tree Model
+
+```{r,warning=FALSE}
+# load libraries
+library(rpart)
+library(rattle)
+library(mlr) 
+library(FSelector) 
+library(rpart.plot)
+```
+
+First we have to make a classification task with our training set. This is where we can define which type of machine learning problem we’re trying to solve and define the target variable
+```{r,warning=FALSE}
+
+(dt_task <- makeClassifTask(data=train.set, target="Dropout"))
+
+```
+
+After creating a classification task we need to make a learner that will later take our task to learn the data. I have chosen the rpart decision tree algorithm. This is the Recursive Partitioning Decision Tree.
+
+```{r,warning=FALSE}
+(dt_prob <- makeLearner('classif.rpart', predict.type="prob"))
+
+```
+
+Hyper Parameter Tuning
+
+```{r,warning=FALSE}
+getParamSet("classif.rpart")
+
+dt_param <- makeParamSet( makeDiscreteParam("minsplit", values=seq(5,10,1)),
+            makeDiscreteParam("minbucket",values=seq(round(5/3,0), round(10/3,0), 1)),
+            makeNumericParam("cp",lower = 0.01, upper = 0.05),
+            makeDiscreteParam("maxcompete",
+            values=6), makeDiscreteParam("usesurrogate", values=0),
+            makeDiscreteParam("maxdepth", values=10) )
+
+```
+
+Optimization Algorithm
+
+```{r,warning=FALSE}
+ctrl = makeTuneControlGrid()
+
+# Evaluating Tuning with Resampling
+rdesc = makeResampleDesc("CV", iters = 3L, stratify=TRUE)
+
+```
+
+We can now use tuneParams to show us what combination of hyperparameter values as specified by us will give us the optimal result.
+
+```{r,warning=FALSE}
+set.seed(1000) 
+(dt_tuneparam <- tuneParams(learner=dt_prob,resampling=rdesc,measures=list(tpr,auc,
+            fnr, mmce, tnr, setAggregation(tpr, test.sd)), 
+            par.set=dt_param,control=ctrl,task=dt_task,show.info = TRUE) )
+
+```
+
+Optimal HyperParameters
+
+```{r,warning=FALSE}
+list( 'Optimal HyperParameters' = dt_tuneparam$x, 
+      'Optimal Metrics' = dt_tuneparam$y )
+
+dtree <- setHyperPars(dt_prob, par.vals = dt_tuneparam$x)
+
+```
+
+Model Training
+
+```{r}
+set.seed(1000) 
+dtree_train <- train(learner=dtree, task=dt_task) 
+getLearnerModel(dtree_train)
+
+rpart.plot(dtree_train$learner.model, roundint=FALSE, varlen=3, type = 3,
+           clip.right.labs = FALSE, yesno = 2)
+rpart.rules(dtree_train$learner.model, roundint = FALSE)
+
+```
+
+Model Prediction (Testing):
+We now pass the trained learner to be used to make predictions with our test data.
+
+```{r}
+
+set.seed(1000) 
+(dtree_predict <- predict(dtree_train, newdata = validation.set))
+
+# The threshold for classifying each row is 50/50. This is by default
+# but can be changed later (which I will do).
+dtree_predict %>% calculateROCMeasures()
+
+```
+
+
+```{r}
+dtree_predict.test <- predict(dtree_train, newdata = transformed_test)
+
+sub_tree=as.data.frame(dtree_predict.test)
+head(sub_tree)
+
+#write.csv(sub_tree,"D:/Hamed/KAGGLE COMPETITION/FEATURES/my_new_submission/sub_tree.csv")
+
+
+```
+
+
+
+## 4. K-Nearest Neighbors (KNN)
+
+```{r}
+library(class)
+library(caret)
+library(rpart)
+library(dplyr)
+
+```
+
+
+Create the train and validation labels
+
+```{r,warning=FALSE}
+train.dropout_labels <- train.set$Dropout
+val.dropout_labels <-validation.set$Dropout
+
+
+# Lets get a good k value
+
+i=1
+k.optm=1
+for (i in 1:28){
+  knn.mod <- knn(train=train.set, test=validation.set, cl=train.dropout_labels, k=i)
+  k.optm[i] <- 100 * sum(val.dropout_labels == knn.mod)/NROW(val.dropout_labels)
+  k=i
+  cat(k,'=',k.optm[i],'
+')
+}
+
+# Plot the K to check Accuracy plot for best k values
+plot(k.optm, type="b", xlab="K- Value",ylab="Accuracy level")
+
+```
+
+Use the best K value to fit a model to the data
+
+```{r,warning=FALSE}
+library(kknn)
+knn.fit <- train.kknn(as.factor(Dropout)~., train.set, ks = 22,
+                      kernel = "rectangular", scale = TRUE)
+pred.train.kknn <- predict(knn.fit, validation.set)
+
+# Lets look at the performance metrics
+confusionMatrix(table(pred.train.kknn ,val.dropout_labels))
+
+```
+
+
+
+Prediction using a new data
+
+```{r,warning=FALSE}
+
+library(caret)
+
+pred_knn<-predict(object=knn.fit,transformed_test,type="raw")
+pred_knn=as.data.frame(pred_knn)
+
+
+submission_knn=as.data.frame(pred_knn)
+head(submission_knn)
+
+# save the file
+#write.csv(submission_knn,"D:/Hamed/KAGGLE COMPETITION/FEATURES/my_new_submission/submission_knn.csv")
+
+```
+
+
+
+```{r,warning=FALSE}
+# Load the engineered and transformed features
+transformed_train=read.csv("transformed_train.csv",header = T)
+transformed_test=read.csv("transformed_test.csv",header = T)
+
+# Convert the response variable from an integer to a factor
+transformed_train$Dropout=as.factor(transformed_train$Dropout)
+
+# Load required packages
+library(class)
+library(caret)
+library(rpart)
+library(dplyr)
+
+
+# Split the transformed_train dataset into training and validation datasets
+set.seed(123)
+## 80% of the sample size
+smp_size <- floor(0.80 * nrow(transformed_train))
+train_ind <- sample(seq_len(nrow(transformed_train)), size = smp_size)
+train.set <- transformed_train[train_ind, ]
+validation.set <- transformed_train[-train_ind, ]
+
+dim(train.set)
+
+str(train.set)
+```
+
+
+
+#### 5. Gradient Boosting Models
+
+C5.0 model training
+```{r,warning=FALSE}
+class(train.set$Dropout)
+```
+
+
+
+```{r,warning=FALSE}
+
+library(caret)
+library(C50)
+# for reproducibility
+set.seed(123)
+fit.c50<-train(Dropout~.,data=train.set, method = "C5.0", metric="Accuracy",
+           trControl=trainControl(method="repeatedcv", number=10, repeats=3))
+fit.c50
+
+
+```
+
+
+C5.0: Model Evaluation and Prediction
+
+```{r,warning=FALSE}
+# Evaluation of model accuracy
+predict_c50<-predict.train(object=fit.c50,validation.set,type="raw")
+confusionMatrix(predict_c50,validation.set$Dropout)
+```
+
+
+```{r,warning=FALSE}
+#Predict new data
+pred.c50<-predict.train(object=fit.c50,transformed_test,type="raw")
+pred.c50=as.data.frame(pred.c50)
+head(pred.c50)
+
+# save the prediction 
+#write.csv(pred.c50,"D:/Hamed/KAGGLE COMPETITION/FEATURES/my_new_submission/submission_c50.csv")
+
+```
+
+
+GBM model training
+
+```{r,warning=FALSE}
+# Stochastic Gradient Boosting GBM model
+
+library(caret)
+library(gbm)
+
+set.seed(123)
+
+fit.gbm <- train(Dropout~., data=train.set, method="gbm", metric="Accuracy", trControl=trainControl(method="repeatedcv", number=10, repeats=3), verbose=FALSE)
+
+fit.gbm
+
+```
+
+
+GBM: Model Evaluation and Prediction
+
+```{r,warning=FALSE}
+# Evaluation of model accuracy
+predict_gbm<-predict.train(object=fit.gbm,validation.set,type="raw")
+
+confusionMatrix(predict_gbm,validation.set$Dropout)
+```
+
+
+```{r,warning=FALSE}
+# Predict new data
+pred.gbm<-predict.train(object=fit.gbm,transformed_test,type="raw")
+pred.gbm=as.data.frame(pred.gbm)
+
+head(pred.gbm)
+# save the prediction 
+#write.csv(pred.gbm,"D:/Hamed/KAGGLE COMPETITION/FEATURES/my_new_submission/submission_gbm.csv")
+
+```
+
+
+
+
