@@ -1,0 +1,380 @@
+---
+title: "Clustering"
+output: word_document
+---
+
+# PART 1
+### 1. LOAD THE DATA
+
+```{r,warning=FALSE}
+hospital_data=read.csv("hospitalUSA.csv",header = T)
+head(hospital_data)
+
+```
+
+
+```{r,warning=FALSE}
+# Load the required packages 
+library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering algorithms & visualization
+
+# Sample 3000 hospitals at random
+dim(hospital_data)
+hospital_data = sample_n(hospital_data,3000)
+dim(hospital_data)
+```
+
+
+```{r,warning=FALSE}
+# Exclude the dependent variable and categorical variables
+hospital_data <- hospital_data[,-c(1,3,4)]
+colnames(hospital_data)
+```
+
+
+```{r,warning=FALSE}
+# Convert the Hospital ID (HID) to the index
+rownames(hospital_data) <- hospital_data$HID
+hospital_data=hospital_data[,-1] #then drop the HID
+head(hospital_data)
+
+```
+
+### 2. TRANSFORMATION
+
+```{r,warning=FALSE}
+
+# Transform the data through scalling
+hospital_data<-scale(hospital_data)
+head(hospital_data)
+
+```
+
+
+### 3. DIMENSION REDUCTION
+Use the factor method to summarize the demographic variables and the operation variables and come out with a final reduced list of factor variables (perhaps 3 or 4).  Use the rotated factors in order to find a good interpretation of the factors and try to make a good story
+
+
+#### Factor Analysis
+ Factor analysis can only be used to reduce continuous variables of the dataset. Therefore, we will be removing categorical variables
+
+- Removing the dependent and categorical variables
+As mentioned above, factor analysis works in an unsupervised setup only for the numerical variables, therefore, we will get rid of the categorical and the dependent variable.
+
+```{r,warning=FALSE}
+df=hospital_data[,-6] #remove SALES variable
+colnames(df)
+```
+
+
+```{r,warning=FALSE}
+# Create a matrix out of the data frame
+Factor1 = subset(df)
+class(Factor1)
+head(Factor1)
+```
+
+
+```{r,warning=FALSE}
+# Creating Correlation Matrix for the above dataset
+# This will give us an idea of the variables that are highly correlated to each other.
+corrm<- cor(Factor1)
+corrm
+
+
+```
+
+#### Finding Eigen Values
+We will now find the eigenvalues to decide the number of factors that will correctly group the features on the level of their similarity allowing us to manually select features from each of these groups.
+
+```{r,warning=FALSE}
+eigen(corrm)$values
+```
+
+Coming up with other useful values such as cumulative eigenvalue, percentage variance and cumulative percentage variance.
+```{r,warning=FALSE}
+eigen_values <- mutate(data.frame(eigen(corrm)$values),
+                       cum_sum_eigen=cumsum(eigen.corrm..values),
+                       pct_var=eigen.corrm..values/sum(eigen.corrm..values),
+                       cum_pct_var=cum_sum_eigen/sum(eigen.corrm..values))
+eigen_values
+
+```
+
+Clearly, the four factors explain approximately 78% of the variance.  Therefore, the number of factors will be equal to 4 in our case.
+```{r,warning=FALSE}
+# Reducing Variable using Factor Analysis
+# Using FA to perform factor analysis.
+require(psych)
+FA<-fa(r=corrm, 4, rotate="varimax", fm="ml")
+FA_SORT<-fa.sort(FA)
+
+# Grouping variables.
+load1 = FA_SORT$loadings
+load1
+```
+
+
+
+### MARKET SEGMENTATION
+
+- (i). K-means clustering
+
+```{r,warning=FALSE}
+# visualize the distance matrix 
+distance <- get_dist(df)
+fviz_dist(distance, gradient = list(low = "#00AFBB", mid = "white", high = "#FC4E07"))
+```
+
+
+```{r,warning=FALSE}
+# Here will group the data into fifteen clusters 
+k2 <- kmeans(df, centers = 15, nstart = 25)
+str(k2)
+
+```
+
+We can also view our results by using fviz_cluster. This provides a nice illustration of the clusters. If there are more than two dimensions (variables) fviz_cluster will perform principal component analysis (PCA) and plot the data points according to the first two principal components that explain the majority of the variance.
+
+```{r,warning=FALSE}
+fviz_cluster(k2, data = df)
+
+```
+
+Alternatively, you can use standard pairwise scatter plots to illustrate the clusters compared to the original variables.
+
+```{r,warning=FALSE}
+df %>%
+  as_tibble() %>%
+  mutate(cluster = k2$cluster,
+         hospitals = row.names(df)) %>%
+  ggplot(aes(KNEE, BEDS, color = factor(cluster), label = hospitals)) +
+  geom_text()
+
+
+```
+
+Because the number of clusters (k) must be set before we start the algorithm, it is often advantageous to use several different values of k and examine the differences in the results. We can execute the same process for 3, 4, and 5 clusters, and the results are shown in the figure:
+
+```{r,warning=FALSE}
+k3 <- kmeans(df, centers = 3, nstart = 25)
+k4 <- kmeans(df, centers = 4, nstart = 25)
+k5 <- kmeans(df, centers = 5, nstart = 25)
+
+# plots to compare
+p1 <- fviz_cluster(k2, geom = "point", data = df) + ggtitle("k = 2")
+p2 <- fviz_cluster(k3, geom = "point",  data = df) + ggtitle("k = 3")
+p3 <- fviz_cluster(k4, geom = "point",  data = df) + ggtitle("k = 4")
+p4 <- fviz_cluster(k5, geom = "point",  data = df) + ggtitle("k = 5")
+
+library(gridExtra)
+grid.arrange(p1, p2, p3, p4, nrow = 2)
+
+
+```
+
+Although this visual assessment tells us where true dilineations occur(or do not occur) between clusters,it does not tell us what the optimal number of clusters is.
+
+#### Determining Optimal Clusters
+As you may recall the analyst specifies the number of clusters to use;preferably the analyst would like to use the optimal number of clusters. To aid the analyst,the following explains the three most popular methods for determining the optimal clusters, which includes:
+
+
+#### Average Silhouette Method
+In short, the average silhouette approach measures the quality of a clustering. That is, it determines how well each object lies within its cluster. A high average silhouette width indicates a good clustering. The average silhouette method computes the average silhouette of observations for different values of k. The optimal number of clusters k is the one that maximizes the average silhouette over a range of possible values for k.2
+
+- We can use the silhouette function in the cluster package to compuate the  average silhouette width. The following code computes this approach for 1-15 clusters. The results show that 2 clusters maximize the average silhouette values with 4 clusters coming in as second optimal number of clusters. function to compute average silhouette for k clusters
+
+```{r,warning=FALSE}
+
+avg_sil <- function(k) {
+  km.res <- kmeans(df, centers = k, nstart = 25)
+  ss <- silhouette(km.res$cluster, dist(df))
+  mean(ss[, 3])
+}
+
+
+# Compute and plot wss for k = 15 to k = 30
+k.values <- 15:30
+
+# extract avg silhouette for 2-15 clusters
+avg_sil_values <- map_dbl(k.values, avg_sil)
+
+plot(k.values, avg_sil_values,
+     type = "b", pch = 19, frame = FALSE, 
+     xlab = "Number of clusters K",
+     ylab = "Average Silhouettes")
+
+```
+
+
+Similar to the elbow method, this process to compute the “average silhoutte method” has been wrapped up in a single function (fviz_nbclust):
+
+```{r}
+fviz_nbclust(df, kmeans, method = "silhouette")
+```
+
+
+```{r}
+# Now will group the data into two clusters since thats optimal k
+k3 <- kmeans(df, centers = 2, nstart = 25)
+str(k3)
+
+```
+
+We can also view our results by using fviz_cluster. This provides a nice illustration of the clusters. If there are more than two dimensions (variables) fviz_cluster will perform principal component analysis (PCA) and plot the data points according to the first two principal components that explain the majority of the variance.
+
+```{r}
+fviz_cluster(k3, data = df)
+```
+
+
+```{r}
+# Partitioning Around Medoids (PAM)
+#execute the pam algorithm with the dataset created for the example
+result <- pam(df, 2, FALSE, "euclidean")
+
+#print the results data in the screen
+summary(result)
+
+```
+
+
+```{r}
+#plot a graphic showing the clusters and the medoids of each cluster
+plot(result$data, col = result$clustering)
+points(result$medoids, col = 1:2, pch = 4)
+```
+
+
+```{r}
+# Compute PAM
+library("cluster")
+pam.res <- pam(df, 2)
+
+# Visualize
+fviz_cluster(pam.res)
+
+```
+
+
+#### ii). Summary statistics for each cluster
+
+```{r}
+clust=data.frame("cluster"=pam.res$clustering)
+clust$cluster=as.factor(clust$cluster)
+
+# Make the index into a column for the clustered_data
+Hospital_ID <- rownames(clust)
+clust<- cbind(Hospital_ID,clust)
+head(clust)
+str(clust)
+```
+
+
+```{r}
+# Make the index into a column for the hospital_data
+Hospital_ID <- rownames(hospital_data)
+sales=data.frame("SALES"=hospital_data[,6])
+sales_data <- cbind(Hospital_ID,sales)
+head(sales_data)
+str(sales_data)
+
+```
+
+
+```{r}
+new_df = merge(x=sales_data,y=clust,by='Hospital_ID')
+head(new_df)
+str(new_df)
+```
+
+
+```{r}
+# Box plot of sales by clusters
+# From the box plots cluster 10 had the highest average sales, cluster 14 had  the most outliers
+
+attach(new_df)
+p<-ggplot(new_df, aes(x=cluster, y=SALES, color=cluster)) +
+  geom_boxplot()
+p
+
+```
+
+# PART 2
+
+```{r}
+# Data preparation
+
+hospital_data=as.data.frame(hospital_data)
+dim(hospital_data)
+sum(is.na(hospital_data)) #how many missing values
+hospitals=na.omit(hospital_data)#remove missing values
+dim(hospitals)
+```
+
+
+```{r}
+#Split the data into train and test data
+smp_size <- floor(0.80 * nrow(hospitals))
+train_ind <- sample(seq_len(nrow(hospitals)), size = smp_size)
+train.set <- hospitals[train_ind, ]
+validation.set <- hospitals[-train_ind, ]
+
+```
+
+### Decision tree model
+
+Thus model will be used predict the sales using the independent variables (operational and demographic)
+
+```{r}
+library(rpart)
+mytree <- rpart(
+  SALES ~ ., 
+  data = train.set)
+mytree
+```
+
+
+```{r}
+library(rattle)
+library(rpart.plot)
+library(RColorBrewer)
+
+# plot mytree
+fancyRpartPlot(mytree, caption = NULL)
+
+```
+
+
+
+```{r}
+# Full-grown tree with 6 splits using  different variables (Not running the line below - do it to see the tree)
+fancyRpartPlot(mytree)
+```
+
+
+```{r}
+# As always, predict and evaluate on the test set, here the predicted vales of transformed sales is compared with actual validation test data and the mean squared error is calculated to check the error of our prediction, the smaller the better. 
+test.pred.rtree <- predict(mytree,validation.set) 
+
+RMSE.rtree <- sqrt(mean((test.pred.rtree-validation.set$SALES)^2))
+RMSE.rtree
+```
+
+
+```{r}
+#Mean absolute error
+MAE.rtree <- mean(abs(test.pred.rtree-validation.set$SALES))
+MAE.rtree
+```
+
+
+```{r}
+# Now that we have a full-grown tree, let’s see if it’s possible to prune it…
+
+# Check cross-validation results (xerror column)
+printcp(mytree)
+
+```
+

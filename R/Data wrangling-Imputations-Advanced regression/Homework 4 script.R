@@ -1,0 +1,139 @@
+
+
+# Use the Carseats data set in ISLR package
+# ---------------------------------------------------------------------------
+
+# (a) Split the data set into a training set and a test set.
+library(ISLR)
+Carseats=as.data.frame(Carseats)
+
+# (b) Fit a regression tree to the training set by selecting an appropriate target variable to predict. Plot the tree, and interpret the results. What test MSE do you obtain?
+
+
+# (c) Use cross-validation in order to determine the optimal level of tree complexity. 
+
+
+# (d) Use the bagging approach to do the prediction. What test MSE do you obtain? Which variables are most important? Plot the variable importance.
+
+
+# (e) Use random forest to do the prediction. What test MSE do you obtain?  Which variables are most important. Plot the variable importance. Try various values of m, the number of variables considered at each split and describe the effect of m on the error rate.
+
+
+
+
+
+
+# In this problem, you will use support vector approaches in order to predict
+# whether a given car gets high or low gas mileage based on the Auto data set
+# in the ISLR library.
+
+
+# (a) Create a binary variable that takes on a 1 for cars with gas mileage
+# above the median, and a 0 for cars with gas mileage below the median.
+
+
+
+
+
+
+# (b) Fit a support vector classifier to the data with various values of cost,
+# in order to predict whether a car gets high or low gas mileage. Report
+# the cross-validated training dataset error associated with different
+# values of this parameter. Comment on your results.
+
+
+
+
+
+# (c) Now repeat (b), this time using SVMs with radial and polynomial basis
+# kernels, with different values of gamma (sigma) and degree and cost.
+# Comment on your results.
+
+
+
+
+
+
+# This problem involves the OJ data set which is part of the ISLR package.
+
+
+
+# (a) Create a training set containing a random sample of 60% of the observations, and a test set containing the remaining observations.
+
+
+
+# (b) Fit a support vector classifier with a linear kernel to the training data using cost=0.01, with Purchase as the response and the other variables as predictors. Describe the results obtained.
+
+
+
+# (c) What are the training and test error rates?
+
+
+
+# (d) Use a tuning grid in caret to select an optimal cost. Consider values in the range 0.01 to 10.
+
+
+
+# (e) Compute the training and test error rates using this new value for cost.
+
+
+
+# (f) Repeat parts (b) through (e) using a support vector machine with a radial kernel. Use a grid of values for gamma but use default for cost
+
+
+# (g) Repeat parts (b) through (e) using a support vector machine with a polynomial kernel.  Tune degree and cost using a grid.
+
+
+# (h) Overall, which approach seems to give the best results on this data?
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

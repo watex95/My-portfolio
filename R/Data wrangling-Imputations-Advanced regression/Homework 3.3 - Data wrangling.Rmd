@@ -1,0 +1,81 @@
+---
+title: "Data Wrangling - 3.3"
+author: "HILLARY"
+date: "2/23/2020"
+output: word_document
+---
+
+## (a).	Load the datasets/tables flights and airlines
+
+```{r, warning=FALSE}
+
+# (a).	Install and load the library nycflights13
+library(tidyverse)
+library(dplyr)
+library(nycflights13)
+
+```
+
+
+
+# (b).	Load the datasets/tables flights and airlines
+
+```{r, warning=FALSE}
+
+airlines=data.frame(airlines)
+flights=data.frame(flights)
+airports=data.frame(airports)
+planes=data.frame(planes)
+weather=data.frame(weather)
+
+head(airlines)
+head(flights)
+head(airports)
+head(planes)
+head(weather)
+
+```
+
+
+## (c). What is the primary key of the planes table 
+
+```{r, warning=FALSE}
+
+#Planes$tailnum this is the primary key as it uniquely identifies each plane in the planes table
+planes%>%count(tailnum)%>%filter(n>1)
+
+
+```
+
+
+## (d).	Add full airline name from the airlines table to the flights table that keeps all the records in the flights table by using the appropriate join
+
+```{r, warning=FALSE}
+
+flights_with_names<-left_join(x=flights,y=airlines,by='carrier',all.x=TRUE)
+
+head(flights_with_names)
+
+
+```
+
+
+
+## (e).	Now add the destination latitude and longitude to the flights table from the airports table by using the appropriate join
+
+```{r, warning=FALSE}
+
+
+# Rename "faa" to "dest" in order to use it as joining key
+names(airports)[names(airports)=="faa"] <- "dest"
+
+flights_dest<-left_join(x=flights,y=airports,by='dest',all.x=TRUE)[c("year","month",
+              "day","dep_time","sched_dep_time","dep_delay","arr_time",
+              "sched_arr_time","arr_delay","carrier","flight","tailnum","origin",
+              "dest","air_time" ,"distance","hour","minute","time_hour","lat","lon")]
+
+head(flights_dest)
+
+```
+
+

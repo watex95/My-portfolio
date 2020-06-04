@@ -1,0 +1,172 @@
+---
+title: "Homework 4.5- Caravan dataset"
+author: "Hamed"
+date: "3/2/2020"
+output: word_document
+---
+
+
+## This question uses the Caravan data set.
+
+##(a) Create a training set consisting of the first 1,000 observations, and a test set consisting of the remaining observations.
+
+```{r ,warning=FALSE}
+
+library(gbm)
+library(ISLR)
+data("Caravan")
+
+set.seed(1)
+Caravan$Purchase = ifelse(Caravan$Purchase=="Yes",1,0)
+
+caravan.train = Caravan[1:1000,]
+caravan.test = Caravan[1001:5822,]
+
+```
+
+##(b) Fit a boosting model to the training set with Purchase as the response and the other variables as predictors. Use 1,000 trees, and a shrinkage value of 0.01. Which predictors appear to be the most important?
+
+
+```{r ,warning=FALSE}
+#Variable importance
+caravan.boost = gbm(formula=Purchase ~ .,data=caravan.train, n.trees=1000,
+                    shrinkage=.01)
+summary(caravan.boost)
+
+```
+
+
+
+## (c) Use the boosting model to predict the response on the test data.
+## Predict that a person will make a purchase if the estimated probability of purchase is greater than 20 %.
+
+```{r ,warning=FALSE}
+#Prediction 
+caravan.probs = predict(caravan.boost, newdata=caravan.test,n.trees=1000,type="response")
+
+caravan.pred = ifelse(caravan.probs>.2,"Yes","No")
+caravan.pred[1:5] #first five predicted values
+```
+
+
+```{r ,warning=FALSE}
+test.y = ifelse(caravan.test$Purchase==1,"Yes","No")
+test.y[1:5] #fist five
+```
+
+
+```{r ,warning=FALSE}
+# Confusion matrix
+confusionMat=table(caravan.pred,test.y)
+
+#What fraction of the people predicted to make a purchase do in fact make one? 
+confusionMat[4]/(confusionMat[3]+confusionMat[4])
+
+```
+
+# How does this compare with the results obtained from applying KNN or logistic regression to this data set?
+
+```{r ,warning=FALSE}
+# Apply Logistic regression
+lm.caravan <-  glm(Purchase ~ . , data=caravan.train, family=binomial)
+lm.prob <-  predict(lm.caravan, caravan.test, type="response")
+lm.pred <-  ifelse(lm.prob > 0.2, "Yes", "No")
+
+# confusion matrix
+CF=table(test.y, lm.pred)
+CF
+```
+
+
+```{r ,warning=FALSE}
+#What fraction of the people predicted to make a purchase do in fact make one?
+CF[4]/(CF[3]+CF[4])
+
+```
+
+##(d) Try a stacking ensemble with at least two different models.set the response variable to factor
+
+```{r ,warning=FALSE}
+library(mlbench)
+library(caret)
+library(caretEnsemble)
+
+
+# Reload the data and convert the response variable to factor
+
+set.seed(1)
+Caravan2=as.data.frame(Caravan)
+
+Caravan$Purchase<-as.factor(Caravan2$Purchase)
+caravan2.train = Caravan2[1:1000,]
+caravan2.test = Caravan2[1001:5822,]
+table(caravan2.train$Purchase)
+```
+
+
+```{r ,warning=FALSE}
+
+# Example of Stacking algorithms
+# create submodels
+control<-trainControl(method="repeatedcv", number=10, repeats=3,
+                        savePredictions=TRUE, classProbs=TRUE)
+
+algorithmList <- c('rpart','glm', 'knn', 'svmRadial')
+
+models <- caretList(Purchase~.,data=caravan2.train,trControl=control
+            ,methodList=algorithmList)
+
+results <- resamples(models)
+summary(results)
+
+```
+
+
+```{r}
+dotplot(results)
+
+```
+
+When we combine the predictions of different models using stacking, it is desirable that the predictions made by the sub-models have low correlation. This would suggest that the models are skillful but in different ways, allowing a new classifier to figure out how to get the best from each model for an improved score.
+
+If the predictions for the sub-models were highly correlated (>0.75) then they would be making the same or very similar predictions most of the time reducing the benefit of combining the predictions.
+
+```{r ,warning=FALSE}
+
+# correlation between results
+modelCor(results)
+
+#We can see that all pairs of predictions have generally low correlation.
+#The two methods with the highest correlation between their predictions are Logistic Regression (GLM) and kNN at 0.517 correlation which is not considered high (>0.75).
+
+splom(results)
+
+
+```
+
+
+
+Let’s combine the predictions of the classifiers using a simple linear model. stack using glm
+
+```{r ,warning=FALSE}
+stackControl <- trainControl(method="repeatedcv", number=10, repeats=3, savePredictions=TRUE, classProbs=TRUE)
+set.seed(1)
+stack.glm <-caretStack(models, method="glm", trControl=stackControl)
+print(stack.glm)
+
+```
+
+We can also use more sophisticated algorithms to combine predictions in an effort to tease out when best to use the different methods. In this case, we can use the random forest algorithm to combine the predictions.
+
+```{r ,warning=FALSE}
+# stack using random forest
+# set.seed(123)
+# library(mlbench)
+# library(caret)
+# library(caretEnsemble)
+# 
+# stack.rf <- caretStack(models, method="rf", metric="Accuracy", trControl=stackControl)
+# print(stack.rf)
+
+```
+
