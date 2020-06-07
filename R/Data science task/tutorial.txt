@@ -1,0 +1,501 @@
+## Tutorial 2: An introduction of evaluating models 
+## ECOM151: Big Data Applications in Finance 
+library(ISLR) 
+library(corrplot) 
+library(MLmetrics)
+library(MASS)
+library(class)
+rm(list=ls()) # cleaning environment
+
+## Question 1 ----------------------------------------------------------------------------------------
+## Load and explore the dataset "Smarket" from the ISLR package. (Load by: data(Smarket))
+## a. Check what the dataset is about. Use the help function, i.e., "?Smarket".
+##    (Note: This works only because the data belongs to the ISLR package. If you load your own
+##           data, this will not work.)
+data(Smarket)
+attach(Smarket)
+
+## b. Check the names of the dataset.
+colnames(Smarket)
+names(Smarket)
+head(Smarket)
+
+## c. Check the dimensions of the dataset.
+dim(Smarket)
+
+
+## d. Summarize the dataset, both in terms of numbers, and in terms of cross-plots.
+##    (Hint: Use functions summary and pairs).
+summary(Smarket)
+
+## e. Create a dummy variable "Direction" to be equal to 1 if the return "Today"
+##    is positive, and 0 otherwise. Hint: Use ifelse().
+
+Smarket$Direction = ifelse(Today>0,1,0) # replacing Direction variable in Smarket dataset
+
+## Question 2 ----------------------------------------------------------------------------------------
+## What is the correlation between today's return ("Today") and the lagged returns ("Lag1" etc.)?
+cor(Today,Lag1)
+
+## From simple correlation, if the return yesterday was negative, what is the likely "direction" for
+## today's return? 
+
+# The correlation with Lag1 is negative, so the likely "direction" for today's returns is up.
+# But note that the correlation is very close to zero.
+
+## Plot the correlation matrix. (Hint: Use "corrplot" from the corrplot package) 
+## Use: http://www.sthda.com/english/wiki/visualize-correlation-matrix-using-correlogram
+## It is non-trivial to display small correlation values. 
+# install.packages("corrplot")
+library(corrplot)
+
+M <- cor(Smarket[, c(-9)]) # store correlation table in M
+# trying three corrplots
+corrplot(M, method="circle")
+corrplot(M, method="number")
+# first two did not deliver clear results for small values of correlation
+corrplot(M, method="color",  
+         type="upper", order="hclust",
+         addCoef.col = "black", # Add coefficient of correlation
+         tl.col="black", tl.srt=45, #Text label color and rotation
+         # # hide correlation coefficient on the principal diagonal
+         diag=FALSE
+)
+
+## --------------------------------
+## LINEAR REGRESSION MODEL:
+## --------------------------------
+
+## Question 3 ----------------------------------------------------------------------------------------
+## Create two datasets: A "test" and a "train" dataset.
+## Store data before the year 2005 in the object named "train".
+## Store data on after the year 2005 in the object named "test". 
+
+train_id = (Year<2005)
+train=Smarket[train_id,]
+dim(train)
+
+test=Smarket[!train_id,]
+dim(test)
+
+## a. Fit a linear regression model predicting the "direction" of the return using the train dataset.
+##    Store the regression in an object named "m1". 
+m1 = lm(Direction~Lag1+Lag2, data=train)
+summary(m1)
+
+
+## b. Estimate the predicted values for "Direction" in object named "yhat". 
+yhat=predict(m1)
+
+## c. Store the actual values for "Direction" in object named "yact" (Caution: Only for train data).
+yact=train$Direction
+
+## d. Create a new variable yhat.train.binary with value = 1 if "yhat" > 0.50, and 0 otherwise. 
+yhat.train.binary= ifelse(yhat>0.5,1,0)
+
+## e. Tabulate the "confusion matrix" for the prediction, with the training data.
+##    Store it in object "confuse.mat.lm.train".
+confuse.mat.lm.train = table(yhat.train.binary, yact)
+print(confuse.mat.lm.train)
+
+
+## f. What fraction of actual positive returns are predicted to be positive by your model?
+333/(333+173)
+# 0.6581028
+
+# mean(yhat.train.binary==yact)
+##    What fraction of actual negative returns are predicted to be positive by your model?
+308/(308+184)
+# 0.6260163
+
+## g. Predict out of sample, for the "test" dataset, and store it as "yhat.test". 
+yhat.test =predict(m1,test)
+length(yhat.test)
+
+## h. Store the actual values for "Direction" in the test data as "yact.test".
+yact.test = test$Direction
+
+## i. Create a new variable yhat.test.binary with value = 1 if "yhat.test" > 0.50, and 0 otherwise.
+yhat.test.binary = ifelse(yhat.test>0.5,1,0)
+
+
+## j. Tabulate the "confusion matrix" for the prediction, with the test data.
+##    Store it in object "confuse.mat.lm.test"
+confuse.mat.lm.test = table(yhat.test.binary , yact.test)
+print(confuse.mat.lm.test)
+
+## k. What fraction of actual positive returns are predicted to be positive by your model?
+107/(107+34)
+# 0.7588652
+
+# mean(yhat.test.binary==yact.test)
+## l.  What fraction of actual negative returns are predicted to be positive by your model?
+308/(308+184)
+# 0.6260163
+
+## --------------------------------
+## LOGISTIC REGRESSION MODEL:
+## --------------------------------
+
+## Question 4 ----------------------------------------------------------------------------------------
+## a. Fit a logistic regression model predicting the "direction" of the return using the train data.
+##    Store the regression in an object named "m2".
+##    Hint: Use the function: "glm", with the option for 'family' set as "binomial". 
+
+m2 = glm(Direction~Lag1+Lag2, data=train, family=binomial)
+
+## b. Estimate the predicted values for "Direction" in object named "yhat".
+##    Hint: Use the option "type" set to "response" in the predict function. 
+yhat = predict(m2, train, type ="response")
+
+## c. Store the actual values for "Direction" in object named "yact" (Caution: Only for train data).
+yact = train$Direction
+
+## d. Create a new variable yhat.train.binary with value = 1 if "yhat" > 0.50, and 0 otherwise. 
+yhat.train.binary = ifelse(yhat>0.5,1,0)
+
+## e. Tabulate the "confusion matrix" for the prediction, with the training data.
+##    Store it in object "confuse.mat.log.train".
+confuse.mat.log.train=table(yhat.train.binary,yact)
+print(confuse.mat.log.train)
+
+# recall
+# print(confuse.mat.lm.train)
+## f. What fraction of actual positive returns are predicted to be positive by your model?
+331/(331+175)
+
+##    What fraction of actual negative returns are predicted to be positive by your model?
+307/(307+185)
+
+## g. Predict out of sample, for the "test" dataset, and store it as "yhat.test". 
+yhat.test = predict(m2, test, type="response")
+
+
+## h. Store the actual values for "Direction" in the test data as "yact.test".
+yact = test$Direction
+
+## i. Create a new variable yhat.test.binary with value = 1 if "yhat.test" > 0.50, and 0 otherwise.
+yhat.test.binary = ifelse(yhat.test>0.50,1,0)
+
+## j. Tabulate the "confusion matrix" for the prediction, with the test data.
+##    Store it in object "confuse.mat.log.test"
+confuse.mat.log.test=table(yhat.test.binary,yact)
+print(confuse.mat.log.test)
+## k. What fraction of actual positive returns are predicted to be positive by your model?
+104/(104+71)
+
+## l. What fraction of actual negative returns are predicted to be positive by your model?
+
+
+## --------------------------------
+## LINEAR DISCRIMINANT ANALYSIS:
+## --------------------------------
+## Question 5 ----------------------------------------------------------------------------------------
+## a. Fit a model using lda.fit() with the training dataset. 
+##    Store the regression in an object named "m3". 
+##    Hint: Use the function: "lda.fit" from the package "MASS". 
+# library(MASS)
+m3 = lda(Direction~Lag1+Lag2, data=train)
+print(m3)
+
+## b. Estimate the predicted values for "Direction" in object named "yhat".
+yhat= predict(m3)
+names(yhat)
+
+## c. Store the actual values for "Direction" in object named "yact" (Caution: Only for train data).
+yact= train$Direction
+
+## d. Create a new variable yhat.train.binary with value = 1 if if the posterior that the observation
+##    belongs to group 1, i.e., positive returns and 0 otherwise.
+##    Hint: Use: the data stored in "yhat$posterior". 
+yhat.train.binary = ifelse(yhat$posterior[,2]>0.5,1,0)
+yhat.train.binary.check = yhat$class
+yhat.train.binary[1:20]
+yhat.train.binary.check[1:20]
+
+## e. Tabulate the "confusion matrix" for the prediction, with the training data.
+##    Store it in object "confuse.mat.lda.train".
+confuse.mat.lda.train = table(yhat.train.binary,yact)
+print(confuse.mat.lda.train)
+## f. What fraction of actual positive returns are predicted to be positive by your model?
+
+##   What fraction of actual negative returns are predicted to be positive by your model?
+
+
+## g. Predict out of sample, for the "test" dataset, and store it as "yhat.test". 
+yhat.test = predict(m3,test)
+
+
+## h. Store the actual values for "Direction" in the test data as "yact.test".
+yact = test$Direction
+
+## i. Create a new variable yhat.test.binary with value = 1 if if the posterior that the observation
+##    belongs to group 1, i.e., positive returns and 0 otherwise.
+##    Hint: Use: the data stored in "yhat.test$posterior". 
+yhat.test.binary = ifelse(yhat.test$posterior[,2]>0.5,1,0)
+
+
+## j. Tabulate the "confusion matrix" for the prediction, with the test data.
+##    Store it in object "confuse.mat.lda.test"
+confuse.mat.lda.test = table(yhat.test.binary,yact)
+print(confuse.mat.lda.test)
+
+## k. What fraction of actual positive returns are predicted to be positive by your model?
+
+## l. What fraction of actual negative returns are predicted to be positive by your model?
+
+
+## --------------------------------
+## K Nearest Neighbour Estimation
+## --------------------------------
+
+## Question 6 ----------------------------------------------------------------------------------------
+## a. Set up a dataset named "knn.train" with just two variables from "train", Lag1 and Lag2.
+knn.train = cbind(train$Lag1,train$Lag2)
+
+
+## b. Set up a dataset named "knn.test" with just two variables from "test", Lag1 and Lag2.
+knn.test = cbind(test$Lag1,test$Lag2)
+
+
+## c. Create an object named "knn.train.y" with "Direction" from the "train" dataset.
+##    Create an object named "knn.test.y" with "Direction" from the "test" dataset.
+knn.train.y = train$Direction
+knn.test.y  = test$Direction
+
+
+
+
+## d. Use the function knn() to estimate the classifier. Set k = 1.
+##    Store the object as knn.predict
+set.seed(43)
+knn.predict = knn(knn.train, knn.test, knn.train.y ,k=1)
+
+## e. Create the confusion matrix for the test predictions.
+##    Store it as "confuse.knn.1.test" 
+##    Hint: tabulate prediction from object knn.predict with "knn.test.y".
+confuse.knn.1.test = table(knn.predict, yact)
+print(confuse.knn.1.test)
+
+## f. Set K = 3 and re-estimate the model.
+##    Create confusion matrix for the test predictions. 
+##    Store it as "confuse.knn.3.test" 
+knn.predict = knn(knn.train, knn.test, knn.train.y ,k=3)
+confuse.knn.3.test = table(knn.predict, yact)
+print(confuse.knn.3.test)
+
+
+## Question 7 ----------------------------------------------------------------------------------------
+## Of all the models, what has the best out of sample prediction capability.
+## Discuss in detail with an analysis of false positives, false negatives by comparing
+## all of the confusion matrices you have generated with these three models. 
+
+# ISLR. P.151 
+
+
+## Advance (Bonus) Question: Why is the linear model very similar, if not the same, as the logistic
+## regression predictions?
+
+# ISLR. P.130 
+
+
+
+
+
+## End of Tutorial. 
+## Tutorial 3: Best Subset, Ridge Regressions and LASSO 
+## ECOM151: Big Data Applications in Finance 
+library(ISLR) 
+library(leaps) 
+library(glmnet)
+library(pls)
+library(class)
+rm(list=ls())
+## Question 1 ----------------------------------------------------------------------------------------
+## Load and explore the dataset "Hitters" from the ISLR package. (Load by: data(Hitters))
+## a. Check what the dataset is about. Use the help function, i.e., "?Hitters".
+##    (Note: This works only because the data belongs to the ISLR package. If you load your own
+##           data, this will not work.)
+
+data(Hitters)
+attach(Hitters)
+## b. Check the names of the dataset.
+names(Hitters)
+
+
+## c. Check the dimensions of the dataset.
+dim(Hitters)
+
+
+## d. Summarize the dataset, both in terms of numbers, and in terms of cross-plots.
+##    (Hint: Use functions summary and pairs).
+
+summary(Hitters)
+pairs(Hitters[,1:2])
+
+## e. Remove rows where the data for Salary is missing. 
+##    HINT: use na.omit() while doing summary, and is.na() to remove the row entries in the data.
+
+Hitters =na.omit ( Hitters )
+dim ( Hitters )
+sum (is.na( Hitters ))
+
+
+
+## Question 2 ----------------------------------------------------------------------------------------
+## a. Run the best subsets approach to picking the set of variables that can predict salary.
+##    Hint: Use the function regsubsets() in library(leaps). ?regsubsets for more details. 
+##          Set nvmax option to 19 while estimating the regression. 
+regfit.full= regsubsets( Salary~., Hitters )
+summary(regfit.full)
+regfit.full = regsubsets( Salary~., data=Hitters ,nvmax =19)
+reg.summary = summary(regfit.full)
+reg.summary
+
+## b. Examine the R-squared, RSS and adjusted R-squared of the models.
+##    Hint: Use names() to check the various objects in the list from the
+##          object stored with the model estimated in (2a), and then extract the
+##          r-squared values for various models. 
+
+names(reg.summary)
+reg.summary$rsq
+## c. Plot the RSS, adjusted R-squared for all of the models at once. 
+##    Hint: par(mfrow=c(1,2)) to print two plots on the same page.
+par(mfrow=c(2,2))
+plot(reg.summary$rss , xlab ="Number of Variables", ylab =" RSS ", type ="l")
+plot(reg.summary$adjr2 ,xlab =" Number of Variables ", ylab =" Adjusted RSq ", type ="l")
+
+## d. Plot the point on the curves that has the maximum adjusted r-squared statistic.
+##    Hint: Use which.max() to identify the location of the maximum point of a vector.
+which.max(reg.summary$adjr2)
+points(11, reg.summary$adjr2[11], col =" red ", cex =2, pch =20)
+points(which.max(reg.summary$adjr2), reg.summary$adjr2[which.max(reg.summary$adjr2)], col =" red ", cex =2, pch =20)
+
+## e. Use the regsubsets() function's plot() command to check whether your plots are correct.
+##    Use: plot() on the object that stores the model from regsubsets().
+
+plot(reg.summary$cp ,xlab ="Number of Variables", ylab ="Cp", type='l')
+which.min (reg.summary$cp )
+points (10, reg.summary$cp [10] , col ="red", cex =2, pch =20)
+which.min (reg.summary$bic )
+plot(reg.summary$bic , xlab ="Number of Variables", ylab ="BIC", type='l')
+points (6, reg.summary$bic [6], col =" red ",cex =2, pch =20)
+
+plot( regfit.full , scale ="r2")
+plot( regfit.full , scale ="adjr2")
+plot( regfit.full , scale ="Cp")
+plot( regfit.full , scale ="bic")
+
+## -----------------------------------------
+## FORWARD AND BACKWARD STEPWISE SELECTION 
+## -----------------------------------------
+
+## Question 3 ----------------------------------------------------------------------------------------
+## a. On the same data, estimate the "forward" step-wise selection approach.
+##    Hint: use method = "forward" in the function regsubsets()
+regfit.fwd = regsubsets( Salary~. , data= Hitters , nvmax =19, method ="forward")
+regfit.fwd.summary=summary(regfit.fwd)
+
+## b. On the same data, estimate the "backward" step-wise selection approach.
+##    Hint: use method = "backward" in the function regsubsets()
+regfit.bwd = regsubsets( Salary~. , data= Hitters , nvmax =19, method ="backward")
+regfit.bwd.summary=summary(regfit.bwd)
+
+
+## c. Compare the r-squared estimates between the forward and backward approaches.
+##    Which model would you use based one the maximum R-squared value from these two approaches?
+regfit.fwd.summary$rsq
+regfit.bwd.summary$rsq
+
+## d. Compare the model estimated using forward and backward stepwise selection approaches,
+##    with the best subsets approach. Are the answers identical? If not, why? If yes, why?
+reg.summary$rsq
+
+regfit.fwd.summary$adjr2
+regfit.bwd.summary$adjr2
+reg.summary$adjr2
+
+which.max(regfit.fwd.summary$adjr2)
+which.max(regfit.bwd.summary$adjr2)
+which.max(reg.summary$adjr2)
+
+coef( regfit.full ,7)
+coef( regfit.fwd ,7)
+coef( regfit.bwd ,7)
+
+## --------------------------------
+## RIDGE REGRESSION
+## --------------------------------
+
+## Question 4 ----------------------------------------------------------------------------------------
+## a. Create a matrix of predictors for analysis.
+##    Hint: Use model.matrix() on just the set of predictors in your Hitters dataset.
+##    Store this object as $x$.
+
+
+
+##    Create a vector of the outcome variable for analysis.
+##    Store this object as $y$.
+
+
+
+## b. Create a grid of lambda values for estimation from 10^10 to 10^-2. 
+##    Store this object as grid. Hint: use seq() to implement this.
+# library ( glmnet )
+
+
+## c. Estimate the ridge regression with alpha of zero, and a lambda taking the grid values.
+##    Hint: use glmnet() and set alpha = 0! 
+
+
+##    Note: glmnet() automatically scales variables so that they are on the same scale.
+##          If you don't want that you can set standardize = FALSE.
+
+
+## e. Split the sample randomly into test and train.
+##    Estimate the model using the training data, and evalue the test MSE from the test data.
+##    At what value of $lambda$ is the associated "train MSE" the lowest? 
+
+
+
+## f. At what value of $lambda$ is the associated "test MSE" the lowest?
+
+
+## g. How many variables has Ridge Regression used in the best model according to the test MSE? 
+
+
+## --------------------------------
+## LASSO 
+## --------------------------------
+
+## Question 4 ----------------------------------------------------------------------------------------
+## a. Create a matrix of predictors for analysis.
+##    Hint: Use model.matrix() on just the set of predictors in your Hitters dataset.
+##    Store this object as $x$.
+
+##    Create a vector of the outcome variable for analysis.
+##    Store this object as $y$. 
+
+
+## b. Create a grid of lambda values for estimation from 10^10 to 10^-2. 
+##    Store this object as grid. Hint: use seq() to implement this.
+
+
+## c. Estimate the ridge regression with alpha of zero, and a lambda taking the grid values.
+##    Hint: use glmnet() and set alpha = 0! 
+
+##    Note: glmnet() automatically scales variables so that they are on the same scale.
+##          If you don't want that you can set standardize = FALSE.
+
+
+## e. Split the sample randomly into test and train.
+##    Estimate the model using the training data, and evalue the test MSE from the test data.
+##    At what value of $lambda$ is the associated "train MSE" the lowest? 
+
+## f. At what value of $lambda$ is the associated "test MSE" the lowest?
+
+## g. How many variables has Ridge Regression used in the best model according to the test MSE? 
+
+
+
+## End of Tutorial

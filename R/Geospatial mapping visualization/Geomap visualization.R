@@ -13,7 +13,7 @@ library(ggmap)
 # mapsEmbed,mapsStaticAPI then go to credentials and obtain  your
 # API key and paste it here, then run the following code;
 
-register_google(key = "AIzaSyBy7kjg324D0OVOZJ5BnUSWpT3Z2LR-SFU") 
+register_google(key = "") 
 
 # Plot with location name (Geocoding)
 nai_center = as.numeric(geocode(" Kenyatta International Convention Centre(KICC) Nairobi Kenya"))
