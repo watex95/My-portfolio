@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1591695392443.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "51891285",
+    "id" : "EF485072",
+    "lastKnownWriteTime" : 1591820057,
+    "last_content_update" : 1591820057448,
+    "path" : "D:/KAZI/OTHER WORK/Network visualization/Network visualization code.R",
+    "project_path" : "Network visualization code.R",
+    "properties" : {
+        "cursorPosition" : "588,0",
+        "scrollLine" : "581"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1591777108362.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "979988058",
+    "id" : "96582CB8",
+    "lastKnownWriteTime" : 1591819769,
+    "last_content_update" : 1591819769473,
+    "path" : "D:/KAZI/OTHER WORK/Network visualization/Network visualization markdown.RMD",
+    "project_path" : "Network visualization markdown.RMD",
+    "properties" : {
+        "cursorPosition" : "545,0",
+        "scrollLine" : "545",
+        "tempName" : "Untitled1"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 5,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}
