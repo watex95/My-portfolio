@@ -1,0 +1,127 @@
+DAX TUTORIAL
+----------------------
+
+What is DAX used for?
+--->Calculated column, measure, table
+
+Syntax , function , context
+measure = function(Table_name[column name])
+
+sales_measure= CALCULATE(SUM(Sales[SalesAmount]),PREVIOUSQUARTER('Calendar'[Datekey]))
+
+CONTEXT
+---------------
+Row context: a formula applied to rows
+Filter context: a formular applied based on categorical columns
+
+
+COUNT FUNCTION
+----------------------------
+COUNTA(  )  : Returns the number non-empty cells
+COUNTAX(  ) : returns the non-empty cells by incorporating filter function
+
+LOGICAL FUNCTIONS
+-------------------------
+IF(AND( 10>9,-10<-1),"All true",One or more false")
+IF(OR( 10>9,-10<-1),"All true",One or more false")
+
+
+INFORMATION FUNCTION
+--------------------------------
+ CONTAINS( table(column) )
+
+
+
+TEXT FUNCTIONS
+-----------------------
+CONCATENATE( "Hello","world")
+EXACT("Hello","hELLO")
+UPPER("hello")
+
+
+DATE-TIME FUNCTIONS
+------------------------------
+TODAY(  )
+YEAR(  )
+NOW(  )
+AGE=YEAR(TODAY())-1995
+ENDOFMONTH(Calendar[Datekey] )
+
+
+NAVIGATION FUNCTIONS
+------------------------------
+RELATED : returns a value from a connected table
+RELATEDTABLE : returns a table from a connected table
+
+CALCULATED COLUMN
+--------------------------------
+Creating a  Binning column in DAX
+----------------------------------------
+Age breakdown=
+IF(Customer[Age] >=55, "55+",
+IF(Customer[Age] >=45, "45-55",
+IF(Customer[Age] >=35, "35-44",
+"18-34"))
+
+
+Month year=
+FORMAT( 
+Date_table[Date],
+"MM-YYYY" )
+
+
+NB: when a row context is used the filter on that row is deactivated.
+  
+//Creating a new foreign Key that wasn't there
+------------------------------------------------------
+TempKey = RELATED('DimTable1[column]') & RELATED( DimTable2[column] )
+
+
+Total Transactions = 
+COUNTROWS(
+RELATEDTABLE('FactTable')
+) 
+
+NESTED IF STATEMENT using SWITCH( )
+--------------------------------------------
+Region volume=
+SWITCH ( TRUE( ),
+FactTable[column] >=7000, "High volume",
+FactTable[column] >=4000, "Medium volume",
+FactTable[column] >=1, "Low volume",
+"NA" )
+
+
+
+Last purchase date =
+MAXX( 
+RELATEDTABLE(FactTable,
+FactTable[Order date])
+)
+
+
+
+
+CALCULATED MEASURES
+-------------------------
+
+Filter context
+CALCULATE:
+syntax
+CALCULATE(expression,filter1,filter2)
+
+Time inteligence functions:
+ comparing data over time, Requirements(date table,one
+row for every date, span range of possible dates)
+ 
+Semi-additive measures
+inventory levels, account balance
+
+
+
+
+
+
+
+
+
